@@ -49,11 +49,9 @@ void setup() {
 
   left.attachClick(goHome);
   left.attachLongPressStart(bootsel);
-  left.attachLongPressStop(goHome);
 
   right.attachClick(fitToScreen);
   right.attachLongPressStart(bootsel);
-  right.attachLongPressStop(fitToScreen);
 
   // mouse and keyboard init
   Mouse.begin();
@@ -93,8 +91,8 @@ void loop() {
   right.tick();
 
   if (millis() - boot > INTERVAL) {
-    left.attachLongPressStart(NULL);
-    right.attachLongPressStart(NULL);
+    left.attachLongPressStart(goHome);
+    right.attachLongPressStart(fitToScreen);
     pixels.fill(pixels.Color(0,255,0));
     pixels.show();
   }
