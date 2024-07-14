@@ -7,8 +7,8 @@
 #include <Adafruit_NeoPixel.h>
 
 //#define SERIAL_DEBUG false
+#define SERIAL_DEBUG_TRACE false
 
-//Adafruit_NeoPixel onboard(1, 16, NEO_GBRW + NEO_KHZ800);
 Adafruit_NeoPixel pixels(3, 3, NEO_GRB + NEO_KHZ800);
 
 Tlv493d mag = Tlv493d();
@@ -32,7 +32,7 @@ coords current = {0,0,0};
 
 int calSamples = 300;
 int sensivity = 8;
-int magRange = 3;
+int magRange = 2;
 int outRange = 127;      // Max allowed in HID report
 float xyThreshold = 0.4; // Center threshold
 
@@ -40,6 +40,8 @@ int inRange = magRange * sensivity;
 float zThreshold = xyThreshold * 1.5;
 
 bool isOrbit = false;
+bool fade = false;
+uint8_t brightness = 255;
 
 void setup() {
   SERIAL_DEBUG_SETUP(9600);
@@ -67,7 +69,6 @@ void setup() {
   mag.disableTemp();
   
   // crude offset calibration on first boot
-  pixels.fill(pixels.Color(0,0,255));
   pixels.show();
   DEBUG("Auto calibration in progress...");
   for (int i = 1; i <= calSamples; i++) {
@@ -78,8 +79,6 @@ void setup() {
 
   offset = { offset.x / calSamples, offset.y / calSamples, offset.z / calSamples };
 
-  pixels.fill(pixels.Color(255,0,255));
-  pixels.show();
   DEBUG("Calibration completed!");
   DEBUG("X", offset.x, "Y", offset.y, "Z", offset.z);
   boot = millis();
@@ -93,8 +92,9 @@ void loop() {
   if (millis() - boot > INTERVAL) {
     left.attachLongPressStart(goHome);
     right.attachLongPressStart(fitToScreen);
-    pixels.fill(pixels.Color(0,255,0));
-    pixels.show();
+    pixels.fill(pixels.Color(0,0,255));
+  } else {
+    pixels.fill(pixels.Color(255,128,0));
   }
 
   // get the mag data
@@ -114,11 +114,19 @@ void loop() {
     // map the magnetometer xy to the allowed 127 range in HID reports
     int xMove = map(current.x, -inRange, inRange, -outRange, outRange);
     int yMove = map(current.y, -inRange, inRange, -outRange, outRange);
-
+    
+    
     // press shift to orbit in Fusion 360 if the pan threshold is not crossed (zAxis)
     if (abs(current.z) < zThreshold && !isOrbit) {
       Keyboard.press(KEY_LEFT_SHIFT);
       isOrbit = true;
+      
+    }
+
+    if (isOrbit) {
+      pixels.fill(pixels.Color(255,0,0));
+    } else {
+      pixels.fill(pixels.Color(0,255,0));
     }
 
     // pan or orbit by holding the middle mouse button and moving proportionally to the xy axis
@@ -131,7 +139,16 @@ void loop() {
     Keyboard.releaseAll();
     isOrbit = false;
   }
-//  DEBUG("X", current.x, "Y", current.y, "Z", current.z);
+  if (brightness == 255) {
+    fade = true;
+  } else if (brightness == 0) {
+    fade = false;
+  }
+  pixels.setBrightness(fade ? brightness-- : brightness++);
+  pixels.show();
+  #if (SERIAL_DEBUG_TRACE && ((!defined(SERIAL_DEBUG) || SERIAL_DEBUG)))
+    DEBUG("X", current.x, "Y", current.y, "Z", current.z);
+  #endif
 }
 
 // go to home view in Fusion 360 by pressing  (CMD + SHIFT + H) shortcut assigned to the custom Add-in command
@@ -157,5 +174,8 @@ void fitToScreen() {
 
 // reboot into programming mode
 void bootsel() {
+  pixels.setBrightness(255);
+    pixels.fill(pixels.Color(255,0,255));
+  pixels.show();
   reset_usb_boot(0, 0);
 }
